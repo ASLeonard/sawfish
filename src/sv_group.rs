@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::hash::Hash;
-
+use serde::{Deserialize, Serialize};
 use log::error;
 
 use crate::expected_ploidy::{SVLocusExpectedCNInfo, SVLocusPloidy};
@@ -11,7 +11,7 @@ use crate::simple_alignment::SimpleAlignment;
 
 /// Index values are not required but useful to trace the origin of the haplotype assembly for
 /// debugging:
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GroupHaplotypeId {
     pub sample_index: usize,
     pub cluster_index: usize,
@@ -33,7 +33,7 @@ impl std::fmt::Debug for GroupHaplotypeId {
 /// For an SV with generalized breakpoints multiple contig alignments are needed, one for each split alignment segment. Note that
 /// the contig_seq might be reverse complemented between the different split representations.
 ///
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ClusterAssemblyAlignment {
     pub contig_seq: Vec<u8>,
 
@@ -51,7 +51,7 @@ pub struct ClusterAssemblyAlignment {
     pub is_fwd_strand: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct ClusterAssembly {
     /// Contig alignment for each split alignment segment
     ///
@@ -70,7 +70,7 @@ impl ClusterAssembly {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SVGroupTestStatus {
     pub are_group_regions_valid: bool,
     pub are_group_haplotypes_valid: bool,
@@ -91,7 +91,7 @@ impl SVGroupTestStatus {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SVGroupHaplotype {
     pub hap_id: GroupHaplotypeId,
 
@@ -103,7 +103,7 @@ pub struct SVGroupHaplotype {
 ///
 /// This includes single RefinedSVs as a degenerate case.
 ///
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SVGroup {
     /// Region(s) to search for supporting reads during scoring
     ///

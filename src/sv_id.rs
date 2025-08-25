@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 /// Details used to generate a unique ID for every SV in the sample
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SVUniqueIdData {
     /// Index of sample in this analysis
     ///

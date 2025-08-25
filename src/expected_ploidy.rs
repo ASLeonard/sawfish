@@ -4,6 +4,8 @@ use crate::copy_number_segmentation::CopyNumberState;
 use crate::genome_regions::GenomeRegionsByChromIndex;
 use crate::genome_segment::GenomeSegment;
 
+use serde::{Deserialize, Serialize};
+
 /// Provide a copy number for the given target region
 ///
 /// If the target region overlaps multiple expected copy number regions, this routine will
@@ -102,7 +104,7 @@ pub enum SVLocusPloidy {
 /// from copy number. The only real use case we currently support for expected copy number is human
 /// sex chromosomes, so the relatiionship can be enriched as needed if other applications arise.
 ///
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SVLocusExpectedCNInfo {
     pub expected_copy_number: u8,
 }

@@ -44,6 +44,8 @@ use crate::sv_id::{SVUniqueIdData, get_sv_id_label};
 use crate::utils::print_fasta;
 use crate::worker_thread_data::BamReaderWorkerThreadDataSet;
 
+use serde::{Deserialize, Serialize};
+
 /// If the full consensus is usable, then return the range of the core assembly within it, and
 /// None otherwise
 #[allow(dead_code)]
@@ -88,7 +90,7 @@ impl fmt::Debug for AlleleType {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AlleleCounts {
     pub any_strand: usize,
 }
@@ -99,7 +101,7 @@ impl AlleleCounts {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, strum::EnumCount, strum::FromRepr)]
+#[derive(Clone, Debug, PartialEq, strum::EnumCount, strum::FromRepr, Serialize, Deserialize)]
 pub enum Genotype {
     Ref,
     Het,
@@ -107,7 +109,7 @@ pub enum Genotype {
 }
 
 /// Phasing information within the scope of one SVGroup
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SVPhaseStatus {
     /// No phase information available
     Unknown,
@@ -119,7 +121,7 @@ pub enum SVPhaseStatus {
     Secondary,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SVSampleScoreInfo {
     /// This is true for any SV exceeding the maximum scoring depth, indicating that no scoring
     /// was attempted for this sample
@@ -214,7 +216,7 @@ impl SVSampleScoreInfo {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default,  Serialize, Deserialize)]
 pub struct SVScoreInfo {
     /// Quality score for any non-reference genotype in any sample based on read-support likelihoods
     pub sv_alt_score: Option<f32>,
@@ -280,7 +282,7 @@ pub enum SVFilterType {
 }
 
 /// Extended items for RefinedSV, they're set into a separate struct so they can be defaulted
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct RefinedSVExt {
     /// If true, do not represent this SV as a higher order event, and assess/report it as a
     /// raw breakpoint
@@ -313,7 +315,7 @@ pub struct RefinedSVExt {
 /// Structural variants including all detailed breakpoint analysis and scoring information
 ///
 /// This is the final format for SVs in preperation for VCF output
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RefinedSV {
     pub id: SVUniqueIdData,
     pub bp: Breakpoint,

@@ -7,7 +7,9 @@ use crate::genome_segment::GenomeSegment;
 use crate::prob_utils::error_prob_to_phred;
 use crate::refine_sv::Genotype;
 
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SharedSampleCopyNumInfo {
     /// Called copy number of sample at the variant locus
     pub copy_number: u32,
@@ -25,7 +27,7 @@ pub struct SharedSampleCopyNumInfo {
     pub expected_copy_number_prob: f64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 /// Per-sample scoring information shared on all variant types (SVs and CNVs)
 pub struct SharedSampleScoreInfo {
     /// Copy number information for CNV or merged SV/CNV events

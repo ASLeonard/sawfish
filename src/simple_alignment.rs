@@ -5,7 +5,9 @@ use rust_vc_utils::bam_utils::cigar::{get_cigar_hard_clipped_read_offset, get_ci
 
 use crate::bam_utils;
 
-#[derive(Clone, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct SimpleAlignment {
     pub ref_offset: i64,
     pub cigar: Vec<Cigar>,

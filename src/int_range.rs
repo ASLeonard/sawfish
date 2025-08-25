@@ -1,5 +1,7 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// A simple type for integer ranges
 ///
 /// All ranges follow the bed file range convention: 0-indexed, half-closed, [start,end)
@@ -7,7 +9,7 @@ use std::fmt;
 /// This struct is used instead of the native rust Range type just to focus on the specific goals of
 /// primarily genomic region intervals.
 ///
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct IntRange {
     pub start: i64,
     pub end: i64,

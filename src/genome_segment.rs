@@ -5,8 +5,10 @@ use rust_vc_utils::ChromList;
 use crate::int_range::get_int_range_dir_distance;
 pub use crate::int_range::{IntRange, get_int_range_distance};
 
+use serde::{Deserialize, Serialize};
+
 /// The structure represents a contiguous region of the genome on a single chromosome
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct GenomeSegment {
     /// chrom_index is defined by the indexing scheme used in the input bam file
     pub chrom_index: usize,

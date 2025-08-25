@@ -7,12 +7,14 @@ pub use strum::EnumCount;
 use crate::genome_segment::{GenomeSegment, get_segment_dir_distance, get_segment_distance};
 use crate::int_range::IntRange;
 
+use serde::{Deserialize, Serialize};
+
 /// Direction of a breakend
 ///
 /// 'LeftAnchor' means that the read to the left side of the breakend is locally mapped.
 /// A 'LeftAnchor' breakend would correspond to the left side of a simple deletion
 ///
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, strum::EnumCount)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, strum::EnumCount, Serialize, Deserialize)]
 pub enum BreakendDirection {
     LeftAnchor,
     RightAnchor,
@@ -20,7 +22,7 @@ pub enum BreakendDirection {
 
 /// A single breakend, half of a breakpoint observation
 ///
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Breakend {
     /// The segment range can represent the uncertainty in the breakend location (if this is a
     /// non-precise breakend candidate), or breakend homology in a refined candidate.
@@ -123,7 +125,7 @@ pub enum BreakpointEvidenceType {
     SoftClip,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum InsertInfo {
     /// Represents an insertion when the size is uncertain and the sequence content is not known
     SizeRange(IntRange),
@@ -184,7 +186,7 @@ impl fmt::Debug for InsertInfo {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Breakpoint {
     pub breakend1: Breakend,
     pub breakend2: Option<Breakend>,
