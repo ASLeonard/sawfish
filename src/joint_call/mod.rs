@@ -19,7 +19,40 @@ use self::sample_output::setup_sample_output;
 use crate::cli::{JointCallDerivedSettings, JointCallSettings, SharedSettings};
 use crate::globals::PROGRAM_VERSION;
 use crate::large_variant_output::{VcfSettings, write_indexed_sv_vcf_file};
-use crate::run_stats::{JointCallRunStats, RunStep, delete_run_stats, write_joint_call_run_stats};
+use crate::run_stats::{JointCallRunStats, RunStep, MultiSampleMergeStats, delete_run_stats, write_joint_call_run_stats};
+use crate::sv_group::{SVGroup};
+
+
+use log::info;
+//use std::fs::File;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use unwrap::unwrap;
+
+
+/// Serialize data to MessagePack format and write to file
+pub fn serialize_to_mpack<T: Serialize>(filename: &str, data: &T) {
+    let mut buf = Vec::new();
+    data.serialize(&mut rmp_serde::Serializer::new(&mut buf))
+         .unwrap();
+
+    info!("Writing data to binary file: '{filename}'");
+    unwrap!(
+            std::fs::write(&filename, buf.as_slice()),
+            "Unable to open and write binary file: '{filename}'"
+        );
+}
+
+/// Deserialize data from MessagePack format file
+pub fn deserialize_from_mpack<T: DeserializeOwned>(filename: &str) -> T {
+    let buf = unwrap!(
+            std::fs::read(&filename),
+            "Unable to open SV groups binary file: '{filename}'"
+        );
+        unwrap!(
+            rmp_serde::from_slice(&buf),
+            "Unable to parse SV groups binary file: '{filename}'"
+        )
+}
 
 pub fn run_joint_call(
     shared_settings: &SharedSettings,
@@ -36,22 +69,60 @@ pub fn run_joint_call(
     let (shared_data, all_sample_data) =
         read_all_sample_data(shared_settings, settings, derived_settings);
 
-    setup_sample_output(
-        &settings.output_dir,
-        &shared_data.chrom_list,
-        &shared_data,
-        &all_sample_data,
-    );
+    if settings.stages.contains(&"bigwig".to_string()) {
+        setup_sample_output(
+            &settings.output_dir,
+            &shared_data.chrom_list,
+            &shared_data,
+            &all_sample_data,
+        );
+    }
+    let mut merged_sv_groups: Vec<SVGroup> = Vec::new();
+    let mut merge_stats = MultiSampleMergeStats::default();
+    let filename = [&settings.output_dir.to_string(),"SV_clusters.bin"].join("");
 
-    let (merged_sv_groups, merge_stats) =
-        merge_haplotypes(shared_settings, settings, &shared_data, &all_sample_data);
+    if settings.stages.contains(&"merge".to_string()) {
+        (merged_sv_groups, merge_stats) =
+            merge_haplotypes(shared_settings, settings, &shared_data, &all_sample_data);
+        
+        write_merged_contigs::write_merged_contig_alignments(
+            shared_settings,
+            settings,
+            &shared_data,
+            &merged_sv_groups,
+        );
 
-    write_merged_contigs::write_merged_contig_alignments(
-        shared_settings,
-        settings,
-        &shared_data,
-        &merged_sv_groups,
-    );
+        serialize_to_mpack(&filename, &merged_sv_groups);
+        /*
+        let mut buf = Vec::new();
+        
+        merged_sv_groups
+            .serialize(&mut rmp_serde::Serializer::new(&mut buf))
+            .unwrap();
+
+        info!("Writing SV groups to binary file: '{filename}'");
+
+        unwrap!(
+            std::fs::write(&filename, buf.as_slice()),
+            "Unable to open and write SV groups to binary file: '{filename}'"
+        );
+        */
+    } else {
+        merged_sv_groups = deserialize_from_mpack::<Vec<SVGroup>>(&filename);
+        /*
+        let buf = unwrap!(
+            std::fs::read(&filename),
+            "Unable to open SV groups binary file: '{filename}'"
+        );
+        merged_sv_groups =  unwrap!(
+            rmp_serde::from_slice(&buf),
+            "Unable to parse SV groups binary file: '{filename}'"
+        );
+        */
+    }
+
+
+    merged_sv_groups = merged_sv_groups.chunks(10).nth(2).unwrap().to_vec();
 
     let enable_phasing = true;
     let (mut sv_groups, mut score_stats) = joint_genotype_all_samples(
@@ -62,6 +133,11 @@ pub fn run_joint_call(
         &all_sample_data,
         merged_sv_groups,
     );
+
+    //if sharding, write sv_groups and score_stats
+
+    //merge shared vectors
+    
 
     find_inversions(&mut sv_groups);
 

@@ -96,6 +96,12 @@ pub struct JointCallSettings {
     /// Disable SV/CNV merge, for internal debug only
     #[arg(hide = true, long)]
     pub disable_sv_cnv_merge: bool,
+
+
+/// A comma-separated list of values
+    #[arg(long, value_delimiter = ',')]
+    pub stages: Vec<String>,
+
 }
 
 /// All per-sample input values to joint-call
