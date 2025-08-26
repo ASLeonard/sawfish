@@ -97,10 +97,17 @@ pub struct JointCallSettings {
     #[arg(hide = true, long)]
     pub disable_sv_cnv_merge: bool,
 
-
-/// A comma-separated list of values
+    /// Stages to run in the joint call
     #[arg(long, value_delimiter = ',')]
     pub stages: Vec<String>,
+
+    /// How many chunks to split the SVGroups into
+    #[arg(long)]
+    pub chunk_size: usize,
+
+    /// If there is chunking, which chunk are we on now?
+    #[arg(long, requires = "chunk_size")]
+    pub chunk: usize,
 
 }
 

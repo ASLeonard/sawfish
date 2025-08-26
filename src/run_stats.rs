@@ -83,6 +83,17 @@ pub struct ScoreStats {
     pub total_scoring_time_secs: f64,
 }
 
+impl ScoreStats {
+    /// Combine two ScoreStats by adding their corresponding fields
+    pub fn merge(&mut self, other: &Self) {
+        self.sv_replicate_haplotype_filter += other.sv_replicate_haplotype_filter;
+        self.sv_gt_exclusion_filter += other.sv_gt_exclusion_filter;
+        self.vcf_output_record_count += other.vcf_output_record_count;
+        self.vcf_duplicate_record_count += other.vcf_duplicate_record_count;
+        self.total_scoring_time_secs += other.total_scoring_time_secs;
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct DiscoverRunStats {
     // Temporarily allow the run_step to be missing when parsing the run stats file:
