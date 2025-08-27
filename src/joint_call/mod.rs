@@ -20,21 +20,22 @@ use crate::cli::{JointCallDerivedSettings, JointCallSettings, SharedSettings};
 use crate::globals::PROGRAM_VERSION;
 use crate::large_variant_output::{VcfSettings, write_indexed_sv_vcf_file};
 use crate::run_stats::{JointCallRunStats, ScoreStats, RunStep, MultiSampleMergeStats, delete_run_stats, write_joint_call_run_stats};
-use crate::sv_group::{SVGroup};
+use crate::sv_group::SVGroup;
 
 
+use camino::Utf8Path;
 use log::info;
-//use std::fs::File;
 use serde::{Serialize, de::DeserializeOwned};
 use unwrap::unwrap;
 
 
 /// Serialize data to MessagePack format and write to file
-pub fn serialize_to_mpack<T: Serialize>(filename: &str, data: &T) {
+pub fn serialize_to_mpack<T: Serialize>(path: impl AsRef<Utf8Path>, data: &T) {
     let mut buf = Vec::new();
     data.serialize(&mut rmp_serde::Serializer::new(&mut buf))
          .unwrap();
 
+    let filename = path.as_ref();
     info!("Writing data to binary file: '{filename}'");
     unwrap!(
             std::fs::write(&filename, buf.as_slice()),
@@ -43,7 +44,8 @@ pub fn serialize_to_mpack<T: Serialize>(filename: &str, data: &T) {
 }
 
 /// Deserialize data from MessagePack format file
-pub fn deserialize_from_mpack<T: DeserializeOwned>(filename: &str) -> T {
+pub fn deserialize_from_mpack<T: DeserializeOwned>(path: impl AsRef<Utf8Path>) -> T {
+    let filename = path.as_ref();
     let buf = unwrap!(
             std::fs::read(&filename),
             "Unable to open SV groups binary file: '{filename}'"
@@ -58,15 +60,16 @@ pub fn deserialize_from_mpack<T: DeserializeOwned>(filename: &str) -> T {
 fn merge_shards(settings: &JointCallSettings) -> (Vec<SVGroup>, ScoreStats) {
     let mut all_vectors: Vec<Vec<SVGroup>> = Vec::new();
     let mut combined_stats = ScoreStats::default();
-    for chunk in 0..=settings.chunk_size { //TODO: handle chunk numbers
+    let output_dir = Utf8Path::new(&settings.output_dir);
+    for chunk in 0..settings.chunk_size {
 
-        let content =deserialize_from_mpack::<Vec<SVGroup>>(&[&settings.output_dir.to_string(),"SV_genotyped_",&chunk.to_string(),".bin"].join(""));
+        let content = deserialize_from_mpack::<Vec<SVGroup>>(output_dir.join(format!("genotyped_SV_groups.{}-of-{}.bin", chunk, settings.chunk_size)));
         all_vectors.push(content);
-        let stats =deserialize_from_mpack::<ScoreStats>(&[&settings.output_dir.to_string(),"SV_genotyped_stats_",&chunk.to_string(),".bin"].join(""));
+
+        let stats = deserialize_from_mpack::<ScoreStats>(output_dir.join(format!("genotyped_SV_stats.{}-of-{}.bin", chunk, settings.chunk_size)));
         combined_stats.merge(&stats);
     }
 
-    // Flatten into a single vector
    (all_vectors.into_iter().flatten().collect(), combined_stats)
 
 }
@@ -82,6 +85,7 @@ pub fn run_joint_call(
     // from whether the new file is written at the end of this discover step.
     //
     delete_run_stats(&settings.output_dir);
+    let output_dir = Utf8Path::new(&settings.output_dir);
 
     let (shared_data, all_sample_data) =
         read_all_sample_data(shared_settings, settings, derived_settings);
@@ -95,7 +99,7 @@ pub fn run_joint_call(
         );
     }
     let mut merged_sv_groups; //: Vec<SVGroup> = Vec::new();
-    let mut merge_stats; // = MultiSampleMergeStats::default();
+    let merge_stats; // = MultiSampleMergeStats::default();
 
     if settings.stages.contains(&"merge".to_string()) {
         (merged_sv_groups, merge_stats) =
@@ -108,51 +112,58 @@ pub fn run_joint_call(
             &merged_sv_groups,
         );
 
-        serialize_to_mpack(&[&settings.output_dir.to_string(),"/SV_clusters.bin"].join(""), &merged_sv_groups);
-        serialize_to_mpack(&[&settings.output_dir.to_string(),"/SV_clusters_stats.bin"].join(""), &merge_stats);
+        serialize_to_mpack(output_dir.join("merged_SV_groups.bin"), &merged_sv_groups);
+        serialize_to_mpack(output_dir.join("merged_SV_stats.bin"), &merge_stats);
 
     } else {
-        merged_sv_groups = deserialize_from_mpack::<Vec<SVGroup>>(&[&settings.output_dir.to_string(),"/SV_clusters.bin"].join(""));
-        merge_stats = deserialize_from_mpack::<MultiSampleMergeStats>(&[&settings.output_dir.to_string(),"/SV_clusters_stats.bin"].join(""));
+        merged_sv_groups = deserialize_from_mpack::<Vec<SVGroup>>(output_dir.join("merged_SV_groups.bin"));
+        merge_stats = deserialize_from_mpack::<MultiSampleMergeStats>(output_dir.join("merged_SV_stats.bin"));
     }
 
-    //skip any chunking if chunk_size=1
-    if settings.chunk_size > 1 {
-        let total_size: usize = merged_sv_groups.len();
-        println!("Chunking SV groups (n={}) into {} parts", total_size, total_size / settings.chunk_size);
-        //TODO: how do we handle perfect file spliting vs remainder
-       //merged_sv_groups = merged_sv_groups.chunks(total_size / settings.chunk_size).nth(settings.chunk).unwrap().to_vec();
+    let (mut sv_groups, mut score_stats) = (Vec::new(), ScoreStats::default());
+    let enable_phasing = true;
 
-        if merged_sv_groups.len() % settings.chunk_size > 0 && settings.chunk == (merged_sv_groups.len() / settings.chunk_size) { //handle the remainder
-            merged_sv_groups = merged_sv_groups.chunks_exact(total_size / settings.chunk_size).remainder().to_vec();
-        } else {
-            merged_sv_groups = merged_sv_groups.chunks_exact(total_size / settings.chunk_size).nth(settings.chunk).unwrap().to_vec();
+    if settings.stages.contains(&"genotype".to_string()) {
+        if settings.chunk_size > 1 {
+            let total_size: usize = merged_sv_groups.len();
+            let chunk_size = (total_size + settings.chunk_size - 1) / settings.chunk_size;
+            merged_sv_groups = merged_sv_groups.chunks(chunk_size).nth(settings.chunk).unwrap().to_vec();
+            //test that the last chunk contributed 11 INS
+        //merged_sv_groups = merged_sv_groups.chunks(total_size / settings.chunk_size).nth(settings.chunk).unwrap().to_vec();
+            /*
+            if merged_sv_groups.len() % settings.chunk_size > 0 && settings.chunk == (merged_sv_groups.len() / settings.chunk_size) { //handle the remainder
+                merged_sv_groups = merged_sv_groups.chunks_exact(total_size / settings.chunk_size).remainder().to_vec();
+            } else {
+                merged_sv_groups = merged_sv_groups.chunks_exact(total_size / settings.chunk_size).nth(settings.chunk).unwrap().to_vec();
+            }
+                */
+        }
+
+        
+        (sv_groups, score_stats) = joint_genotype_all_samples(
+            shared_settings,
+            settings,
+            enable_phasing,
+            &shared_data,
+            &all_sample_data,
+            merged_sv_groups,
+        );
+        
+        if settings.chunk_size > 1 {
+            let output_dir = Utf8Path::new(&settings.output_dir);
+            let genotyped_path = output_dir.join(format!("genotyped_SV_groups.{}-of-{}.bin", settings.chunk, settings.chunk_size));
+            let stats_path = output_dir.join(format!("genotyped_SV_stats.{}-of-{}.bin", settings.chunk, settings.chunk_size));
+
+            serialize_to_mpack(genotyped_path, &sv_groups);
+            serialize_to_mpack(stats_path, &score_stats);
         }
     }
-
-    let enable_phasing = true;
-    let (mut sv_groups, mut score_stats) = joint_genotype_all_samples(
-        shared_settings,
-        settings,
-        enable_phasing,
-        &shared_data,
-        &all_sample_data,
-        merged_sv_groups,
-    );
-    
-    if settings.chunk_size > 1  && settings.stages.contains(&"genotype".to_string()) {
-    serialize_to_mpack(&[&settings.output_dir.to_string(),"SV_genotyped_",&settings.chunk.to_string(),".bin"].join(""), &sv_groups);
-    serialize_to_mpack(&[&settings.output_dir.to_string(),"SV_genotyped_stats_",&settings.chunk.to_string(),".bin"].join(""), &score_stats);
-    }
-
-    //merge shared vectors
-    //only do this if chunk_size > 1
     
     if settings.stages.contains(&"finish".to_string()) {
         if settings.chunk_size > 1  {
             (sv_groups, score_stats) = merge_shards(settings);
         }
-
+    println!("Operating over {} SV groups", sv_groups.len());
     find_inversions(&mut sv_groups);
 
     let refined_cnvs =
